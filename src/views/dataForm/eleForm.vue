@@ -169,7 +169,7 @@
 				Object.assign(data, param);
 				this.api.handleAjax(url, data, "post").done(function(res) {
 					if(res.list.length > 0) {
-						
+
 						self.total = res.total;
 						self.pageSize = res.pageSize;
 						self.pageNum = res.pageNum;
@@ -186,11 +186,7 @@
 			exportExcel(param) {
 				let url = "http://120.26.222.27:10003/exceldata/excelExportElecricConsume";
 				let data = param;
-				console.log(this.createURL(url,data));
-				return;
-      			window.location.href = this.createURL(url,data)
-
-				
+      	window.location.href = this.createURL(url,data)
 			}
 		},
 		watch: {
