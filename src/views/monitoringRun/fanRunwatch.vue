@@ -20,9 +20,6 @@
 								<div class="right-l" :class="{'isthis':openOrClose==0}" @click="handle('close')">
 									关闭
 								</div>
-								<div class="right-l isthis" @click="rest()">
-									重启
-								</div>
 							</div>
 						</div>
 						<div class="bottom-state">
@@ -97,6 +94,7 @@
 
 <script>
 	import { Util } from '../../lib/util.js';
+	import { getToken } from '../../lib/auth.js';
 	import data from './data.vue';
 	import topbar from './topBar.vue';
 	import state from './state.vue';
@@ -141,34 +139,18 @@
 				let _this = this;
 				let pw = prompt("请输入密码：");
 				if(pw && Util.trim(pw).length > 0) {
-					console.log(pw)
 					this.api.postN({
 						url: '/monitor/' + state + 'Monitor',
 						params: {
 							deviceUUID: this.deviceUUID,
-							passworld: Util.trim(pw)
+							passworld: Util.trim(pw),
+							id: JSON.parse(getToken()).systemId
 						},
 						success: function(res) {
 							if(res.response.info.code == 100000) {
 								_this.$message.success({
 									message: '下发命令成功',
 									duration: Util.time()
-								});
-								this.api.createdGoEasy().subscribe({
-									channel: state+'Monitor',
-									onMessage: function(message) {
-										if(message.content.indexOf('打开')> -1){
-											if(message.content.indexOf('成功')> -1){
-												_this.openOrClose = 1
-											};
-										};
-										if(message.content.indexOf('关闭')> -1){
-											if(message.content.indexOf('成功')> -1){
-												_this.openOrClose = 0
-											};
-										};
-										console.log(state+'Monitor', message.content);
-									}
 								});
 							} else {
 								_this.$message.error({
@@ -186,40 +168,12 @@
 						}
 					})
 				} else {
-					
+
 				}
 			},
 			getList(name, danwei) {
 				this.paramsName = name;
 				this.danwei = danwei;
-			},
-			rest(){
-				let _this = this;
-				this.api.postN({
-					url: '/monitorreboot/monitorReboot',
-					params: {
-						deviceUUID: this.deviceUUID,
-					},
-					success: function(res) {
-						if(res.response.info.code == 100000) {
-							_this.$message.success({
-								message: res.response.info.msg,
-								duration: Util.time()
-							});
-						} else {
-							_this.$message.error({
-								message: res.response.info.msg,
-								duration: Util.time()
-							});
-						}
-					},
-					error: function(error) {
-						_this.$message.error({
-							message: '服务器错误',
-							duration: Util.time()
-						});
-					}
-				});
 			},
 			sendMessage() {
 				let _this = this;
@@ -252,26 +206,50 @@
 		},
 		created() {
 			let _this = this;
-			this.api.createdGoEasy().subscribe({
-				channel: 'infocurrentdata',
-				onMessage: function(message) {
-					_this.message = JSON.parse(message.content);
-					console.log('infocurrentdata,风机运行数据', JSON.parse(message.content));
-				}
+			this.api.createdGoEasy().then(res => {
+				res.subscribe('/topic/infocurrentdata', function(respnose) {
+					console.log('infocurrentdata,风机运行数据', JSON.parse(JSON.parse(respnose.body).WiselyResponse.responseMessage));
+					_this.message = JSON.parse(JSON.parse(respnose.body).WiselyResponse.responseMessage);
+				});
 			});
-			this.api.createdGoEasy().subscribe({
-				channel: 'cQueryMonitorStatus',
-				onMessage: function(message) {
-					console.log('cQueryMonitorStatus', JSON.parse(message.content));
-				}
+
+			this.api.createdGoEasy().then(res => {
+				res.subscribe('/topic/cQueryMonitorStatus', function(respnose) {
+					let _data = JSON.parse(JSON.parse(respnose.body).WiselyResponse.responseMessage);
+					console.log('cQueryMonitorStatus,风机运行状态', _data);
+					_this.openOrClose = _data.reply;
+				});
+			})
+			
+			this.api.createdGoEasy().then(res => {
+				res.subscribe( ('/topic/openMonitor'), function(respnose) {
+					let _data = JSON.parse(JSON.parse(respnose.body).WiselyResponse.responseMessage);
+					console.log(state + 'Monitor', _data);
+					if(_data.indexOf('打开') > -1) {
+						if(_data.indexOf('成功') > -1) {
+							_this.openOrClose = 1
+						};
+					};
+				});
 			});
+			
+			this.api.createdGoEasy().then(res => {
+				res.subscribe( ('/topic/closeMonitor'), function(respnose) {
+					let _data = JSON.parse(JSON.parse(respnose.body).WiselyResponse.responseMessage);
+					console.log(state + 'Monitor', _data);
+					if(_data.indexOf('关闭') > -1) {
+						if(_data.indexOf('成功') > -1) {
+							_this.openOrClose = 0
+						};
+					};
+				});
+			})
 			this.sendMessage()
 		},
 		mounted() {
 			this.getList('风机环境温度', '℃');
 		},
-		beforeDestroy() {
-		}
+		beforeDestroy() {}
 	}
 </script>
 
@@ -313,7 +291,6 @@
 					cursor: pointer;
 					.right-l {
 						float: left;
-						margin-right: 3px;
 						width: 59px;
 						height: 100%;
 						text-align: center;
@@ -321,7 +298,7 @@
 						color: #2899ee;
 						background: #e0edfb;
 					}
-					.isthis{
+					.isthis {
 						background: #2899ee;
 						color: #fff;
 					}
